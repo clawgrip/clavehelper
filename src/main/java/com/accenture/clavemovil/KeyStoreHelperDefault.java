@@ -8,15 +8,26 @@ import java.security.cert.CertificateException;
 
 import javax.security.auth.callback.PasswordCallback;
 
+import es.gob.afirma.core.misc.Platform;
+
 final class KeyStoreHelperDefault {
 
 	private static final KeyStoreHelper HELPER;
 	static {
-		HELPER = new KeyStoreHelperJseTest();
+		if (Platform.OS.ANDROID.equals(Platform.getOS())) {
+			HELPER = new KeyStoreHelperAndroid();
+		}
+		else {
+			//HELPER = new KeyStoreHelperJseTest();
+			HELPER = new KeyStoreHelperAndroid();
+		}
 	}
 
-	static KeyStore getKeyStore() throws NoSuchAlgorithmException, CertificateException, IOException, KeyStoreException {
-		return HELPER.getKeyStore();
+	static KeyStore getKeyStore(final KeyStore.PrivateKeyEntry pke) throws NoSuchAlgorithmException,
+			                                                               CertificateException,
+														                   IOException,
+			                                                               KeyStoreException {
+		return HELPER.getKeyStore(pke);
 	}
 
 	static PasswordCallback getPasswordCallback() {

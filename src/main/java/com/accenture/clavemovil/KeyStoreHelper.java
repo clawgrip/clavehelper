@@ -10,7 +10,10 @@ import javax.security.auth.callback.PasswordCallback;
 
 interface KeyStoreHelper {
 
-	KeyStore getKeyStore() throws NoSuchAlgorithmException, CertificateException, IOException, KeyStoreException;
+	KeyStore getKeyStore(final KeyStore.PrivateKeyEntry pke) throws NoSuchAlgorithmException,
+			                                                        CertificateException,
+			                                                        IOException,
+			                                                        KeyStoreException;
 	PasswordCallback getPasswordCallback();
 
 }

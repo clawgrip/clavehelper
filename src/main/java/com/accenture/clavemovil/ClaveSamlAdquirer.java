@@ -8,7 +8,6 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
-import java.util.Enumeration;
 import java.util.Properties;
 
 import es.gob.afirma.core.misc.Base64;
@@ -30,6 +29,8 @@ public final class ClaveSamlAdquirer {
 
 	/** Obtiene un <i>token>/i> de identidad SAML de Clave.
 	 * @param authProvider Modo de autenticaci&oacute;n de Clave a usar.
+	 * @param pke Entrada de llavero (necesaria solo si se usa
+	 *            autenticaci&oacute;n por certificado).
 	 * @return <i>token>/i> de identidad SAML de Clave.
 	 * @throws KeyManagementException
 	 * @throws NoSuchAlgorithmException
@@ -37,11 +38,18 @@ public final class ClaveSamlAdquirer {
 	 * @throws KeyStoreException
 	 * @throws CertificateException
 	 */
-	public static String getSamlToken(final AuthProvider authProvider) throws KeyManagementException,
-	                                                                          NoSuchAlgorithmException,
-	                                                                          IOException,
-	                                                                          KeyStoreException,
-	                                                                          CertificateException {
+	public static String getSamlToken(final AuthProvider authProvider,
+									  final KeyStore.PrivateKeyEntry pke) throws KeyManagementException,
+	                                                                             NoSuchAlgorithmException,
+	                                                                             IOException,
+	                                                                             KeyStoreException,
+	                                                                             CertificateException {
+		if (AuthProvider.AFIRMA.equals(authProvider) && pke == null) {
+			throw new IllegalArgumentException(
+				"Para el uso de Certificado es necesario proporcionar una entrada de llavero" //$NON-NLS-1$
+			);
+		}
+
 		UrlHttpManagerImpl.disableSslChecks();
 
 		final UrlHttpManager uhm = UrlHttpManagerFactory.getInstalledManager();
@@ -156,7 +164,14 @@ public final class ClaveSamlAdquirer {
 				claveResponse = managePin24(uhm, providerRedirectUrl, claveRelayState, newSamlRequest, requestProperties);
 				break;
 			case AFIRMA:
-				claveResponse = manageCert(uhm, providerRedirectUrl, claveRelayState, newSamlRequest, requestProperties);
+				claveResponse = manageCert(
+					uhm,
+					providerRedirectUrl,
+					claveRelayState,
+					newSamlRequest,
+					requestProperties,
+					pke
+				);
 				break;
 			default:
 				throw new UnsupportedOperationException();
@@ -220,23 +235,20 @@ public final class ClaveSamlAdquirer {
 			                         final String providerRedirectUrl,
 			                         final String claveRelayState,
 			                         final String newSamlRequest,
-			                         final Properties requestProperties) throws KeyStoreException,
+			                         final Properties requestProperties,
+									 final KeyStore.PrivateKeyEntry pke) throws KeyStoreException,
 	                                                                            NoSuchAlgorithmException,
 	                                                                            CertificateException,
 	                                                                            IOException,
 	                                                                            KeyManagementException {
-		final KeyStore ks = KeyStoreHelperDefault.getKeyStore();
-
-		final Enumeration<String> aliases = ks.aliases();
-		while (aliases.hasMoreElements()) {
-			System.out.println(aliases.nextElement());
+		final KeyStore ks = KeyStoreHelperDefault.getKeyStore(pke);
+		if (ks != null) {
+			UrlHttpManagerImpl.setSslKeyStore(ks);
+			UrlHttpManagerImpl.setSslKeyStorePasswordCallback(
+					KeyStoreHelperDefault.getPasswordCallback()
+			);
+			UrlHttpManagerImpl.disableSslChecks(); // Para refrescar el KeyManager SSL
 		}
-
-		UrlHttpManagerImpl.setSslKeyStore(ks);
-		UrlHttpManagerImpl.setSslKeyStorePasswordCallback(
-			KeyStoreHelperDefault.getPasswordCallback()
-		);
-		UrlHttpManagerImpl.disableSslChecks(); // Para refrescar el KeyManager SSL
 
 		final byte[] res = uhm.readUrl(
 			providerRedirectUrl +
